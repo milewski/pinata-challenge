@@ -1,6 +1,6 @@
 # Pinata Challenge
 
-![cover.png](cover.png)
+![image](https://github.com/user-attachments/assets/3514ba7e-911b-4470-a83c-7e0230ad94fa)
 
 This Repo is my submission to the dev.to challenge: https://dev.to/challenges/pinata. 
 

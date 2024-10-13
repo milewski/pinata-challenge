@@ -521,7 +521,7 @@
 
             loading.value = true
 
-            const response = await fetch(`https://gateway.pinata.cloud/ipfs/${ shareValue }`)
+            const response = await fetch(`https://pink-realistic-hare-164.mypinata.cloud/ipfs/${ shareValue }`)
 
             await restore(await response.json())
 
@@ -542,7 +542,7 @@
 
                     const player = new Tone.Player({
                         loop: true,
-                        url: `https://gateway.pinata.cloud/ipfs/${ audio }`,
+                        url: `https://pink-realistic-hare-164.mypinata.cloud/ipfs/${ audio }`,
                         fadeIn: '128t',
                         fadeOut: '128t',
                     }).toDestination()

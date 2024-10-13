@@ -5,20 +5,24 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@pixi/ui": "^2.1.5",
-    "imagesloaded": "^5.0.0",
-    "lenis": "^1.1.14",
     "pixi.js": "^8.5.0",
+    "tone": "^15.0.4",
     "vue": "^3.5.10"
   },
   "devDependencies": {
+    "@pixi/sound": "^6.0.1",
     "@vitejs/plugin-vue": "^5.1.4",
     "typescript": "^5.5.3",
     "vite": "^5.4.8",
     "vue-tsc": "^2.1.6"
-  }
+  },
+  "main": "index.js",
+  "repository": "https://github.com/milewski/pinata-challenge.git",
+  "author": "Rafael Milewski <rafael.milewski@gmail.com>",
+  "license": "MIT"
 }

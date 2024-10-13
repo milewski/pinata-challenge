@@ -1,0 +1,17 @@
+services:
+  frontend:
+    image: caddy:2.7.6-alpine
+    volumes:
+      - ./dist:/usr/share/caddy
+    ports:
+      - "8000:80"
+
+  backend:
+    image: node:alpine
+    working_dir: /srv
+    volumes:
+      - ./backend:/srv
+    env_file: ./backend/.env
+    command: "yarn run start"
+    ports:
+      - "8001:3000"

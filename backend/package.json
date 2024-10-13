@@ -1,0 +1,15 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "esno source/index.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "esno": "^4.8.0",
+    "fastify": "^5.0.0",
+    "pinata": "^1.5.0"
+  }
+}

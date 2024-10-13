@@ -571,7 +571,7 @@
 
             const monsters = app.stage.getChildrenByLabel('monster-root', true)
 
-            const tokens = await fetch(`http://localhost:8001/getToken?count=${ monsters.length + 1 }`)
+            const tokens = await fetch(`https://pinata-challenge.onrender.com/getToken?count=${ monsters.length + 1 }`)
             const { token } = await tokens.json()
 
             for (const monster of monsters) {

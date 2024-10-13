@@ -1,5 +1,7 @@
-# Vue 3 + TypeScript + Vite
+# Pinata Challenge
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+![cover.png](cover.png)
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+This Repo is my submission to the dev.to challenge: https://dev.to/challenges/pinata. 
+
+A demo can be found here: https://noisy-monsters.onrender.com?share=QmUzrpzHcwDfKuTqpV19L3mdZ8J84XDE8WCi3Fthx1z8Ub

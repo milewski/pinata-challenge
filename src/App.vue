@@ -3,9 +3,9 @@
     import { onMounted, ref } from 'vue'
     import { Application, Assets, Container, Sprite } from 'pixi.js'
     import { FancyButton, ScrollBox } from '@pixi/ui'
-    import * as Tone from 'tone'
-    import { Player, Recorder, UserMedia } from 'tone'
-    import { copyToClipboard, getRandomElements, trimSilence } from './Helpers.ts'
+    import { Player, start } from 'tone'
+    import { copyToClipboard, getRandomElements } from './Helpers.ts'
+    import { Recorder } from './Recorder.ts'
 
     const monsters = [
         '/assets/monster-1.png',
@@ -29,8 +29,7 @@
 
     const loading = ref(true)
     const shareModal = ref(null)
-    const recorder = new Recorder()
-    const microphone = new UserMedia()
+    const canStart = ref(true)
 
     /**
      * Disable right click, because right click is used to remove the character from the screen
@@ -41,90 +40,26 @@
         }
     }
 
-    let interval
+    const audios: Record<number, { recorded: boolean, blob: Blob | string | null, player: Player | null }> = {}
 
-    async function stopRecording(): Promise<{ blob: Blob, player: Player }> {
+    function playAudios() {
 
-        console.log('stopping')
+        const players = Object.keys(audios)
+            .map(key => audios[ key ].player)
+            .filter(Boolean)
 
-        let blob = await recorder.stop()
-
-        const audioContext = Tone.getContext()
-        const arrayBuffer = await blob.arrayBuffer()
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-        const trimmedBuffer = trimSilence(audioBuffer)
-        // const paddedBuffer = padWithSilence(trimmedBuffer);
-
-        const player = new Player({
-            loop: true,
-            url: trimmedBuffer,
-            fadeIn: '128t',
-            fadeOut: '128t',
-        }).toDestination()
-
-        player.start()
-
-        return {
-            blob,
-            player,
+        for (const player of players) {
+            player.stop()
         }
 
-    }
+        const randomElements = getRandomElements(players, 4)
 
-    async function startRecording(): Promise<{ blob: Blob, player: Player }> {
-
-        if (recorder.state === 'started') {
-            console.log('already running...')
-            return
+        for (const player of randomElements) {
+            player.start()
         }
 
-        clearInterval(interval)
+        setInterval(() => playAudios(), 5000)
 
-        await Tone.start()
-
-        console.log('starting...')
-
-        const highPassFilter = new Tone.Filter({
-            frequency: 300,
-            type: 'highpass',
-        })
-
-        const bandPassFilter = new Tone.Filter({
-            frequency: 1000, // Center frequency (Hz)
-            type: 'bandpass',
-        })
-
-        const pitchShift = new Tone.PitchShift({
-            pitch: 3, // Increase pitch for a higher robotic sound
-            windowSize: 0.1,
-        })
-
-        const distortion = new Tone.Distortion(0.5)
-
-        // const reverb = new Tone.Reverb({
-        //     decay: 1.5,   // Reverb decay time
-        //     preDelay: 0.01, // Reverb pre-delay
-        // }).toDestination();
-
-        microphone.connect(highPassFilter)
-        highPassFilter.connect(recorder)
-        // bandPassFilter.connect(recorder)
-        // pitchShift.connect(distortion);
-        // pitchShift.connect(recorder)
-        // microphone.connect(highPassFilter)
-        // highPassFilter.connect(bandPassFilter)
-        // bandPassFilter.connect(recorder)
-
-        let resolver
-        const promise: Promise<Player> = new Promise(resolve => resolver = resolve)
-
-        setTimeout(async () => stopRecording().then(resolver), 5000)
-
-        await microphone.open()
-
-        recorder.start()
-
-        return promise
     }
 
     onMounted(async () => {
@@ -264,27 +199,6 @@
         container.addChild(box)
         container.addChild(monsterSelection)
 
-
-        const audios: Record<number, { recorded: boolean, blob: Blob | string | null, player: Player | null }> = {}
-
-        setInterval(() => {
-
-            const players = Object.keys(audios)
-                .map(key => audios[ key ].player)
-                .filter(Boolean)
-
-            for (const player of players) {
-                player.stop()
-            }
-
-            const randomElements = getRandomElements(players, 4)
-
-            for (const player of randomElements) {
-                player.start()
-            }
-
-        }, 5000)
-
         function positionFrame(frame, recordButton, monster) {
 
             frame.position.copyFrom(monster)
@@ -354,9 +268,9 @@
 
                 recordButton.visible = false
 
-                const { blob, player } = await startRecording()
+                const { blob, player } = await new Recorder().start()
 
-                if (player) {
+                if (player && blob) {
 
                     audios[ group.uid ].recorded = true
                     audios[ group.uid ].player = player
@@ -442,6 +356,7 @@
 
         if (shareValue) {
 
+            canStart.value = false
             loading.value = true
 
             const response = await fetch(`${ import.meta.env.VITE_PINATA_GATEWAY }/ipfs/${ shareValue }?pinataGatewayToken=${ import.meta.env.VITE_PINATA_GATEWAY_TOKEN }`)
@@ -535,7 +450,7 @@
 
             }
 
-            const res = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+            const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -550,11 +465,11 @@
                 },
             )
 
-            const { IpfsHash } = await res.json()
+            const { IpfsHash } = await response.json()
 
             loading.value = false
 
-            shareModal.value = `https://${ window.location.host }?share=${ IpfsHash }`
+            shareModal.value = `${ window.location.protocol }//${ window.location.host }?share=${ IpfsHash }`
 
         }
 
@@ -590,9 +505,26 @@
 
     })
 
+    function start() {
+        canStart.value = true
+        playAudios()
+    }
+
 </script>
 
 <template>
+
+    <Transition>
+
+        <div class="share-modal" v-if="canStart === false">
+
+            <div @click="start">
+                <h1>Click to Start</h1>
+            </div>
+
+        </div>
+
+    </Transition>
 
     <Transition>
 

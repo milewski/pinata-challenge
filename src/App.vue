@@ -58,7 +58,7 @@
             player.start()
         }
 
-        setInterval(() => playAudios(), 5000)
+        setTimeout(() => playAudios(), 5000)
 
     }
 

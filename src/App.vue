@@ -3,7 +3,7 @@
     import { onMounted, ref } from 'vue'
     import { Application, Assets, Container, Sprite } from 'pixi.js'
     import { FancyButton, ScrollBox } from '@pixi/ui'
-    import { Player, start } from 'tone'
+    import { Player } from 'tone'
     import { copyToClipboard, getRandomElements } from './Helpers.ts'
     import { Recorder } from './Recorder.ts'
 
@@ -26,6 +26,10 @@
         '/assets/record-button.png',
         '/assets/frame.png',
     ]
+
+    const WIDTH = 1920
+    const HEIGHT = 1080
+    const PADDING = 100
 
     const loading = ref(true)
     const shareModal = ref(null)
@@ -69,16 +73,10 @@
          */
         await Promise.all(preload.map(url => Assets.load(url)))
 
-        // Create a new application
         const app = new Application()
-
         await app.init({ resizeTo: window })
-        // Append the application canvas to the document body
-        document.body.appendChild(app.canvas)
 
-        const WIDTH = 1920
-        const HEIGHT = 1080
-        const padding = 100
+        document.body.appendChild(app.canvas)
 
         const ratio = WIDTH / HEIGHT
         const inverseRatio = HEIGHT / WIDTH
@@ -86,13 +84,13 @@
         function actualWidth() {
             const { width, height } = app.screen
             const isWidthConstrained = width < height * ratio
-            return (isWidthConstrained ? width : height * ratio) - padding * 2
+            return (isWidthConstrained ? width : height * ratio) - PADDING * 2
         }
 
         function actualHeight() {
             const { width, height } = app.screen
             const isHeightConstrained = width * inverseRatio > height
-            return (isHeightConstrained ? height : width * inverseRatio) - padding * 2
+            return (isHeightConstrained ? height : width * inverseRatio) - PADDING * 2
         }
 
         const share = new FancyButton({
@@ -118,9 +116,7 @@
         share.eventMode = 'static'
         share.cursor = 'pointer'
 
-        share.addEventListener('click', async function () {
-            await exportShare()
-        })
+        share.addEventListener('click', () => exportShare())
 
         share.setSize(250)
         share.x = 1610
@@ -128,17 +124,13 @@
 
         const background = Sprite.from('/assets/background.jpg')
 
-        const container = createScaledContainer(new Container())
+        const container = adjustContainerSize(new Container())
         container.addChild(background)
         container.addChild(share)
 
-        // container.mask =  new RoundedRectangle(0, 0, container.width, container.height, 30)
+        app.renderer.on('resize', () => adjustContainerSize(container))
 
-        app.renderer.on('resize', function () {
-            createScaledContainer(container)
-        })
-
-        function createScaledContainer(container) {
+        function adjustContainerSize(container) {
 
             container.width = WIDTH
             container.height = HEIGHT
@@ -325,31 +317,6 @@
             return group
         }
 
-        let dragTarget: Sprite | null = null
-
-        app.stage.eventMode = 'static'
-        app.stage.hitArea = app.screen
-        app.stage.on('pointerup', onDragEnd)
-        app.stage.on('pointerupoutside', onDragEnd)
-
-        function onDragMove(event) {
-
-            if (dragTarget) {
-
-                const frame = dragTarget.parent?.getChildByLabel('frame')
-                const recordButton = dragTarget.parent?.getChildByLabel('record-button')
-
-                if (frame && recordButton) {
-                    frame.visible = false
-                    recordButton.visible = false
-                }
-
-                dragTarget.parent.toLocal(event.global, null, dragTarget.position)
-
-            }
-
-        }
-
         const queryString = window.location.search
         const urlParams = new URLSearchParams(queryString)
         const shareValue = urlParams.get('share')
@@ -480,6 +447,31 @@
             loading.value = false
 
             shareModal.value = `${ window.location.protocol }//${ window.location.host }?share=${ IpfsHash }`
+
+        }
+
+        let dragTarget: Sprite | null = null
+
+        app.stage.eventMode = 'static'
+        app.stage.hitArea = app.screen
+        app.stage.on('pointerup', onDragEnd)
+        app.stage.on('pointerupoutside', onDragEnd)
+
+        function onDragMove(event) {
+
+            if (dragTarget) {
+
+                const frame = dragTarget.parent?.getChildByLabel('frame')
+                const recordButton = dragTarget.parent?.getChildByLabel('record-button')
+
+                if (frame && recordButton) {
+                    frame.visible = false
+                    recordButton.visible = false
+                }
+
+                dragTarget.parent.toLocal(event.global, null, dragTarget.position)
+
+            }
 
         }
 

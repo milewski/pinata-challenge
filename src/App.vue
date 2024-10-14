@@ -5,17 +5,17 @@
     import { FancyButton, ScrollBox } from '@pixi/ui'
     import * as Tone from 'tone'
     import { Player, Recorder, UserMedia } from 'tone'
-    import { copyToClipboard, getRandomElements } from './Helpers.ts'
+    import { copyToClipboard, getRandomElements, trimSilence } from './Helpers.ts'
 
     const monsters = [
         '/assets/monster-1.png',
-        '/assets/monster-2.png',
-        '/assets/monster-3.png',
-        '/assets/monster-4.png',
-        '/assets/monster-5.png',
         '/assets/monster-6.png',
-        '/assets/monster-7.png',
+        '/assets/monster-2.png',
+        '/assets/monster-5.png',
+        '/assets/monster-3.png',
         '/assets/monster-8.png',
+        '/assets/monster-4.png',
+        '/assets/monster-7.png',
     ]
 
     const preload = [
@@ -31,6 +31,15 @@
     const shareModal = ref(null)
     const recorder = new Recorder()
     const microphone = new UserMedia()
+
+    /**
+     * Disable right click, because right click is used to remove the character from the screen
+     */
+    document.oncontextmenu = document.body.oncontextmenu = function (event) {
+        if (shareModal.value === null || loading.value == false) {
+            event.preventDefault()
+        }
+    }
 
     let interval
 
@@ -116,55 +125,6 @@
         recorder.start()
 
         return promise
-    }
-
-    function padWithSilence(audioBuffer: AudioBuffer, duration = 5) {
-        const audioContext = Tone.getContext()
-
-        if (audioBuffer.duration < duration) {
-            // Create a new audio buffer with 2 seconds of duration
-            const newAudioBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate)
-
-            // Copy the recorded audio to the new buffer
-            newAudioBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0)
-
-            // Fill the rest with silence
-            // No need to do anything, the buffer is already initialized with silence
-
-            console.log('Audio buffer padded to 2 seconds')
-
-            return newAudioBuffer
-        } else {
-            // If the recorded audio is longer than 2 seconds, trim it
-            const trimmedBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate)
-            trimmedBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0) // Copy first 2 seconds
-            return trimmedBuffer
-        }
-    }
-
-    function trimSilence(buffer: AudioBuffer, threshold = 0.01) {
-        const audioData = buffer.getChannelData(0) // Get the first audio channel
-        const sampleRate = buffer.sampleRate
-
-        // Function to find the first and last sample above the threshold
-        const findNonSilentSample = (data, fromStart = true) => {
-            const increment = fromStart ? 1 : -1
-            let sampleIndex = fromStart ? 0 : data.length - 1
-            while (Math.abs(data[ sampleIndex ]) < threshold && sampleIndex >= 0 && sampleIndex < data.length) {
-                sampleIndex += increment
-            }
-            return sampleIndex
-        }
-
-        const startSample = findNonSilentSample(audioData, true)
-        const endSample = findNonSilentSample(audioData, false)
-
-        // Create a new trimmed buffer
-        const trimmedLength = endSample - startSample
-        const trimmedAudioBuffer = new AudioContext().createBuffer(1, trimmedLength, sampleRate)
-        trimmedAudioBuffer.copyToChannel(audioData.subarray(startSample, endSample), 0)
-
-        return trimmedAudioBuffer
     }
 
     onMounted(async () => {
@@ -274,7 +234,7 @@
 
                 await createMonster(
                     sprite.texture.label!,
-                    app.screen.width / 2 + 230 / 2,
+                    app.screen.width / 2 - sprite.width / 2,
                     app.screen.height / 2,
                     texture,
                 )
@@ -304,11 +264,6 @@
         container.addChild(box)
         container.addChild(monsterSelection)
 
-        document.oncontextmenu = document.body.oncontextmenu = function (event) {
-            if (shareModal.value === null || loading.value == false) {
-                event.preventDefault()
-            }
-        }
 
         const audios: Record<number, { recorded: boolean, blob: Blob | string | null, player: Player | null }> = {}
 
@@ -539,7 +494,7 @@
 
             const monsters = app.stage.getChildrenByLabel('monster-root', true)
 
-            const tokens = await fetch(`https://pinata-challenge.onrender.com/getToken?count=${ monsters.length + 1 }`)
+            const tokens = await fetch(`${ import.meta.env.VITE_BACKEND_API }/getToken?count=${ monsters.length + 1 }`)
             const { token } = await tokens.json()
 
             for (const monster of monsters) {
@@ -554,7 +509,7 @@
                     const formData = new FormData()
                     formData.append('file', blob)
 
-                    const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+                    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
                             method: 'POST',
                             headers: {
                                 Authorization: `Bearer ${ token }`,
@@ -563,7 +518,7 @@
                         },
                     )
 
-                    const { IpfsHash } = await res.json()
+                    const { IpfsHash } = await response.json()
 
                     audioHash = IpfsHash
 

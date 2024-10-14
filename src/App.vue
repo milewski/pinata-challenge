@@ -371,6 +371,8 @@
 
             console.log('restoring...')
 
+            const promises = []
+
             for (const { creature, position, audio } of data.monsters) {
 
                 const texture = textures.find(texture => texture.label === creature)
@@ -378,15 +380,21 @@
 
                 if (audio) {
 
+                    let resolver
+
+                    promises.push(new Promise(resolve => resolver = resolve))
+
                     const player = new Player({
                         loop: true,
+                        autostart: false,
                         url: `${ import.meta.env.VITE_PINATA_GATEWAY }/ipfs/${ audio }?pinataGatewayToken=${ import.meta.env.VITE_PINATA_GATEWAY_TOKEN }`,
                         fadeIn: '128t',
                         fadeOut: '128t',
-                    }).toDestination()
+                        onload: resolver,
+                    })
 
                     audioObject = {
-                        player,
+                        player: player.toDestination(),
                         blob: audio,
                     }
 
@@ -395,6 +403,8 @@
                 await createMonster(creature, position.x, position.y, texture, audioObject)
 
             }
+
+            await Promise.all(promises)
 
         }
 

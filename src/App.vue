@@ -29,7 +29,7 @@
 
     const WIDTH = 1920
     const HEIGHT = 1080
-    const PADDING = 100
+    const PADDING = 50
 
     const loading = ref(true)
     const shareModal = ref(null)
@@ -56,10 +56,10 @@
             player.stop()
         }
 
-        const randomElements = getRandomElements(players, 4)
+        const randomElements: Player[] = getRandomElements(players, 4)
 
         for (const player of randomElements) {
-            player.start()
+            player.start('2t', '16t')
         }
 
         setTimeout(() => playAudios(), 5000)

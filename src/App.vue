@@ -1,68 +1,63 @@
 <script setup lang="ts">
 
     import { onMounted, ref } from 'vue'
-    import {
-        Application,
-        Assets,
-        autoDetectRenderer,
-        Bounds,
-        Container,
-        FederatedEvent, Graphics, RoundedRectangle,
-        Sprite,
-        Texture
-    } from 'pixi.js'
+    import { Application, Assets, Container, Sprite } from 'pixi.js'
     import { FancyButton, ScrollBox } from '@pixi/ui'
-    import * as Tone from "tone";
-    import { Sound, sound } from "@pixi/sound";
-    import { Recorder } from "./Recorder.ts";
-    import { ReverbFilter } from "@pixi/sound/lib/filters/ReverbFilter";
-    import { FederatedEventMap } from "pixi.js/lib/events/FederatedEventMap";
-    import { FederatedPointerEvent } from "pixi.js/lib/events/FederatedPointerEvent";
-    import { Player } from "tone";
+    import * as Tone from 'tone'
+    import { Player, Recorder, UserMedia } from 'tone'
+    import { copyToClipboard, getRandomElements } from './Helpers.ts'
+
+    const monsters = [
+        '/assets/monster-1.png',
+        '/assets/monster-2.png',
+        '/assets/monster-3.png',
+        '/assets/monster-4.png',
+        '/assets/monster-5.png',
+        '/assets/monster-6.png',
+        '/assets/monster-7.png',
+        '/assets/monster-8.png',
+    ]
+
+    const preload = [
+        ...monsters,
+        '/assets/share.png',
+        '/assets/background.jpg',
+        '/assets/monster-selection.png',
+        '/assets/record-button.png',
+        '/assets/frame.png',
+    ]
 
     const loading = ref(true)
     const shareModal = ref(null)
-
-    // start recording
-
-    const recorder = new Tone.Recorder();
-    const microphone = new Tone.UserMedia()
-
-    let soundIndex = 0
-
-    const tracks: Tone.Player[] = []
-
-    function getRandomElements<T>(arr: T[], num = 5): T[] {
-        const shuffled = arr.slice().sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, num);
-    }
+    const recorder = new Recorder()
+    const microphone = new UserMedia()
 
     let interval
 
-    async function stopRecording(): Promise<{ blob: Blob, player: Tone.Player }> {
+    async function stopRecording(): Promise<{ blob: Blob, player: Player }> {
 
         console.log('stopping')
 
-        let blob = await recorder.stop();
+        let blob = await recorder.stop()
 
-        const audioContext = Tone.getContext();
-        const arrayBuffer = await blob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        const trimmedBuffer = trimSilence(audioBuffer);
+        const audioContext = Tone.getContext()
+        const arrayBuffer = await blob.arrayBuffer()
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+        const trimmedBuffer = trimSilence(audioBuffer)
         // const paddedBuffer = padWithSilence(trimmedBuffer);
 
-        const player = new Tone.Player({
+        const player = new Player({
             loop: true,
             url: trimmedBuffer,
             fadeIn: '128t',
-            fadeOut: '128t'
+            fadeOut: '128t',
         }).toDestination()
 
         player.start()
 
         return {
             blob,
-            player
+            player,
         }
 
     }
@@ -76,30 +71,26 @@
 
         clearInterval(interval)
 
-        await Tone.start();
-
-        for (const player of tracks) {
-            // player.stop()
-        }
+        await Tone.start()
 
         console.log('starting...')
 
         const highPassFilter = new Tone.Filter({
             frequency: 300,
             type: 'highpass',
-        });
+        })
 
         const bandPassFilter = new Tone.Filter({
             frequency: 1000, // Center frequency (Hz)
             type: 'bandpass',
-        });
+        })
 
         const pitchShift = new Tone.PitchShift({
             pitch: 3, // Increase pitch for a higher robotic sound
             windowSize: 0.1,
-        });
+        })
 
-        const distortion = new Tone.Distortion(0.5);
+        const distortion = new Tone.Distortion(0.5)
 
         // const reverb = new Tone.Reverb({
         //     decay: 1.5,   // Reverb decay time
@@ -128,59 +119,63 @@
     }
 
     function padWithSilence(audioBuffer: AudioBuffer, duration = 5) {
-        const audioContext = Tone.getContext();
+        const audioContext = Tone.getContext()
 
         if (audioBuffer.duration < duration) {
             // Create a new audio buffer with 2 seconds of duration
-            const newAudioBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate);
+            const newAudioBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate)
 
             // Copy the recorded audio to the new buffer
-            newAudioBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0);
+            newAudioBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0)
 
             // Fill the rest with silence
             // No need to do anything, the buffer is already initialized with silence
 
-            console.log('Audio buffer padded to 2 seconds');
+            console.log('Audio buffer padded to 2 seconds')
 
             return newAudioBuffer
         } else {
             // If the recorded audio is longer than 2 seconds, trim it
-            const trimmedBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate);
-            trimmedBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0); // Copy first 2 seconds
+            const trimmedBuffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate)
+            trimmedBuffer.copyToChannel(audioBuffer.getChannelData(0), 0, 0) // Copy first 2 seconds
             return trimmedBuffer
         }
     }
 
     function trimSilence(buffer: AudioBuffer, threshold = 0.01) {
-        const audioData = buffer.getChannelData(0); // Get the first audio channel
-        const sampleRate = buffer.sampleRate;
+        const audioData = buffer.getChannelData(0) // Get the first audio channel
+        const sampleRate = buffer.sampleRate
 
         // Function to find the first and last sample above the threshold
         const findNonSilentSample = (data, fromStart = true) => {
-            const increment = fromStart ? 1 : -1;
-            let sampleIndex = fromStart ? 0 : data.length - 1;
+            const increment = fromStart ? 1 : -1
+            let sampleIndex = fromStart ? 0 : data.length - 1
             while (Math.abs(data[ sampleIndex ]) < threshold && sampleIndex >= 0 && sampleIndex < data.length) {
-                sampleIndex += increment;
+                sampleIndex += increment
             }
-            return sampleIndex;
-        };
+            return sampleIndex
+        }
 
-        const startSample = findNonSilentSample(audioData, true);
-        const endSample = findNonSilentSample(audioData, false);
+        const startSample = findNonSilentSample(audioData, true)
+        const endSample = findNonSilentSample(audioData, false)
 
         // Create a new trimmed buffer
-        const trimmedLength = endSample - startSample;
-        const trimmedAudioBuffer = new AudioContext().createBuffer(1, trimmedLength, sampleRate);
-        trimmedAudioBuffer.copyToChannel(audioData.subarray(startSample, endSample), 0);
+        const trimmedLength = endSample - startSample
+        const trimmedAudioBuffer = new AudioContext().createBuffer(1, trimmedLength, sampleRate)
+        trimmedAudioBuffer.copyToChannel(audioData.subarray(startSample, endSample), 0)
 
-        return trimmedAudioBuffer;
+        return trimmedAudioBuffer
     }
 
     onMounted(async () => {
 
+        /**
+         * Preload all required assets
+         */
+        await Promise.all(preload.map(url => Assets.load(url)))
+
         // Create a new application
         const app = new Application()
-        // Initialize the application
 
         await app.init({ resizeTo: window })
         // Append the application canvas to the document body
@@ -188,26 +183,22 @@
 
         const WIDTH = 1920
         const HEIGHT = 1080
-        const padding = 100;
+        const padding = 100
 
         const ratio = WIDTH / HEIGHT
         const inverseRatio = HEIGHT / WIDTH
 
         function actualWidth() {
-            const { width, height } = app.screen;
-            const isWidthConstrained = width < height * ratio;
-            return (isWidthConstrained ? width : height * ratio) - padding * 2;
+            const { width, height } = app.screen
+            const isWidthConstrained = width < height * ratio
+            return (isWidthConstrained ? width : height * ratio) - padding * 2
         }
 
         function actualHeight() {
-            const { width, height } = app.screen;
-            const isHeightConstrained = width * inverseRatio > height;
-            return (isHeightConstrained ? height : width * inverseRatio) - padding * 2;
+            const { width, height } = app.screen
+            const isHeightConstrained = width * inverseRatio > height
+            return (isHeightConstrained ? height : width * inverseRatio) - padding * 2
         }
-
-        // preload
-        const shareTexture = await Assets.load('/assets/share.png')
-        // const share = new Sprite(shareTexture)
 
         const share = new FancyButton({
             defaultView: '/assets/share.png',
@@ -218,16 +209,16 @@
                     props: {
                         scale: { x: 1.1, y: 1.1 },
                     },
-                    duration: 80
+                    duration: 80,
                 },
                 pressed: {
                     props: {
                         scale: { x: 0.9, y: 0.9 },
                     },
-                    duration: 80
-                }
-            }
-        });
+                    duration: 80,
+                },
+            },
+        })
 
         share.eventMode = 'static'
         share.cursor = 'pointer'
@@ -240,10 +231,9 @@
         share.x = 1610
         share.y = 480
 
-        const backgroundTexture = await Assets.load('/assets/background.jpg')
-        const background = new Sprite(backgroundTexture)
+        const background = Sprite.from('/assets/background.jpg')
 
-        const container = createScaledContainer(new Container());
+        const container = createScaledContainer(new Container())
         container.addChild(background)
         container.addChild(share)
 
@@ -255,31 +245,22 @@
 
         function createScaledContainer(container) {
 
-            container.width = WIDTH;
-            container.height = HEIGHT;
-            container.scale.x = actualWidth() / WIDTH;
-            container.scale.y = actualHeight() / HEIGHT;
-            container.x = app.screen.width / 2 - actualWidth() / 2;
-            container.y = app.screen.height / 2 - actualHeight() / 2;
+            container.width = WIDTH
+            container.height = HEIGHT
+            container.scale.x = actualWidth() / WIDTH
+            container.scale.y = actualHeight() / HEIGHT
+            container.x = app.screen.width / 2 - actualWidth() / 2
+            container.y = app.screen.height / 2 - actualHeight() / 2
 
-            return container;
+            return container
 
         }
 
-        app.stage.addChild(container);
+        app.stage.addChild(container)
 
-        // Load the bunny texture
-        const textures: Texture[] = await Promise.all([
-            Assets.load('/assets/monster-1.png'),
-            Assets.load('/assets/monster-2.png'),
-            Assets.load('/assets/monster-3.png'),
-            Assets.load('/assets/monster-4.png'),
-            Assets.load('/assets/monster-5.png'),
-            Assets.load('/assets/monster-6.png'),
-            Assets.load('/assets/monster-7.png'),
-            Assets.load('/assets/monster-8.png'),
-            // await Assets.load('/assets/box.png'),
-        ])
+        const textures = monsters
+            .map(url => Assets.get(url))
+            .map(texture => (texture.source.scaleMode = 'linear', texture))
 
         const sprites = textures.map(texture => {
 
@@ -295,7 +276,7 @@
                     sprite.texture.label!,
                     app.screen.width / 2 + 230 / 2,
                     app.screen.height / 2,
-                    texture
+                    texture,
                 )
 
             })
@@ -304,11 +285,7 @@
 
         })
 
-        textures.forEach(function (texture) {
-            texture.source.scaleMode = 'linear'
-        })
-
-        const monsterSelection = new Sprite(await Assets.load('/assets/monster-selection.png'))
+        const monsterSelection = Sprite.from('/assets/monster-selection.png')
 
         const box = new ScrollBox({
             background: 'rgba(47% 88% 65% / 30%)',
@@ -328,7 +305,7 @@
         container.addChild(monsterSelection)
 
         document.oncontextmenu = document.body.oncontextmenu = function (event) {
-            if (shareModal.value === null) {
+            if (shareModal.value === null || loading.value == false) {
                 event.preventDefault()
             }
         }
@@ -345,7 +322,7 @@
                 player.stop()
             }
 
-            const randomElements = getRandomElements(players, 4);
+            const randomElements = getRandomElements(players, 4)
 
             for (const player of randomElements) {
                 player.start()
@@ -365,26 +342,17 @@
             recordButton.position.y += 230
             recordButton.scale.set(0.9)
 
-            const shouldShow = !audios[ monster.parent.uid ].recorded;
+            const shouldShow = !audios[ monster.parent.uid ].recorded
 
             frame.visible = shouldShow
             recordButton.visible = shouldShow
 
         }
 
-        /**
-         * Preload
-         */
-        await Assets.load('/assets/record-button.png')
-        const frameTexture = await Assets.load('/assets/frame.png')
-
         async function createMonster(name: string, x, y, texture, audio: {
             player: Player,
             blob: string
         } | null = null) {
-
-            // const frameTexture = await Assets.load('/assets/frame.png')
-            // const recordButtonTexture = await Assets.load('/assets/record-button.png')
 
             const recordButton = new FancyButton({
                 defaultView: '/assets/record-button.png',
@@ -395,21 +363,21 @@
                         props: {
                             scale: { x: 1.1, y: 1.1 },
                         },
-                        duration: 80
+                        duration: 80,
                     },
                     pressed: {
                         props: {
                             scale: { x: 0.9, y: 0.9 },
                         },
-                        duration: 80
-                    }
-                }
-            });
+                        duration: 80,
+                    },
+                },
+            })
 
             recordButton.label = 'record-button'
 
-            const frame = new Sprite({ texture: frameTexture, label: 'frame' })
-            const group = new Container({ label: "monster-root" });
+            const frame = new Sprite({ texture: Assets.get('/assets/frame.png'), label: 'frame' })
+            const group = new Container({ label: 'monster-root' })
             const monster = new Sprite({ label: name, texture })
 
             group.addChild(frame, monster, recordButton)
@@ -429,7 +397,7 @@
 
             recordButton.addEventListener('click', async function () {
 
-                recordButton.visible = false;
+                recordButton.visible = false
 
                 const { blob, player } = await startRecording()
 
@@ -513,15 +481,15 @@
 
         }
 
-        const queryString = window.location.search;
-        const urlParams = new URLSearchParams(queryString);
-        const shareValue = urlParams.get('share');
+        const queryString = window.location.search
+        const urlParams = new URLSearchParams(queryString)
+        const shareValue = urlParams.get('share')
 
         if (shareValue) {
 
             loading.value = true
 
-            const response = await fetch(`https://pink-realistic-hare-164.mypinata.cloud/ipfs/${ shareValue }?pinataGatewayToken=ahsMpcZoZlWCAFml2rozSSnu9U1kqlYd7Roi6D1lPMhpdOqHMWyxDYDFoY4QTF18`)
+            const response = await fetch(`${ import.meta.env.VITE_PINATA_GATEWAY }/ipfs/${ shareValue }?pinataGatewayToken=${ import.meta.env.VITE_PINATA_GATEWAY_TOKEN }`)
 
             await restore(await response.json())
 
@@ -540,16 +508,16 @@
 
                 if (audio) {
 
-                    const player = new Tone.Player({
+                    const player = new Player({
                         loop: true,
-                        url: `https://pink-realistic-hare-164.mypinata.cloud/ipfs/${ audio }?pinataGatewayToken=ahsMpcZoZlWCAFml2rozSSnu9U1kqlYd7Roi6D1lPMhpdOqHMWyxDYDFoY4QTF18`,
+                        url: `${ import.meta.env.VITE_PINATA_GATEWAY }/ipfs/${ audio }?pinataGatewayToken=${ import.meta.env.VITE_PINATA_GATEWAY_TOKEN }`,
                         fadeIn: '128t',
                         fadeOut: '128t',
                     }).toDestination()
 
                     audioObject = {
                         player,
-                        blob: audio
+                        blob: audio,
                     }
 
                 }
@@ -566,7 +534,7 @@
 
             const data = {
                 version: 1,
-                monsters: []
+                monsters: [],
             }
 
             const monsters = app.stage.getChildrenByLabel('monster-root', true)
@@ -576,26 +544,26 @@
 
             for (const monster of monsters) {
 
-                const creature: Sprite = monster.getChildAt(1);
+                const creature: Sprite = monster.getChildAt(1)
                 const { blob, player } = audios[ monster.uid ]
 
                 let audioHash = blob instanceof Blob ? null : blob
 
                 if (blob && player && blob instanceof Blob) {
 
-                    const formData = new FormData();
-                    formData.append("file", blob);
+                    const formData = new FormData()
+                    formData.append('file', blob)
 
-                    const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-                            method: "POST",
+                    const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+                            method: 'POST',
                             headers: {
                                 Authorization: `Bearer ${ token }`,
                             },
                             body: formData,
-                        }
-                    );
+                        },
+                    )
 
-                    const { IpfsHash } = await res.json();
+                    const { IpfsHash } = await res.json()
 
                     audioHash = IpfsHash
 
@@ -607,13 +575,13 @@
                     position: {
                         x: creature.position.x,
                         y: creature.position.y,
-                    }
+                    },
                 })
 
             }
 
-            const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
-                    method: "POST",
+            const res = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${ token }`,
@@ -621,13 +589,13 @@
                     body: JSON.stringify({
                         pinataContent: data,
                         pinataMetadata: {
-                            name: "metadata.json"
-                        }
+                            name: 'metadata.json',
+                        },
                     }),
-                }
-            );
+                },
+            )
 
-            const { IpfsHash } = await res.json();
+            const { IpfsHash } = await res.json()
 
             loading.value = false
 
@@ -653,8 +621,8 @@
                 const recordButton = dragTarget.parent?.getChildByLabel('record-button')
 
                 if (frame && recordButton) {
-                    frame.visible = true;
-                    recordButton.visible = true;
+                    frame.visible = true
+                    recordButton.visible = true
                     positionFrame(frame, recordButton, dragTarget)
                 }
 
@@ -667,17 +635,6 @@
 
     })
 
-    function copyToClipboard(event: Event) {
-
-        const element = event.target as HTMLInputElement
-
-        element.select();
-        element.setSelectionRange(0, 99999);
-
-        navigator.clipboard.writeText(shareModal.value);
-
-    }
-
 </script>
 
 <template>
@@ -688,7 +645,7 @@
 
             <div>
                 <h1>Copy and Share!</h1>
-                <input @click="copyToClipboard($event)" :value="shareModal"/>
+                <input @click="copyToClipboard($event, shareModal)" :value="shareModal"/>
             </div>
 
         </div>
@@ -696,15 +653,15 @@
     </Transition>
 
     <Transition>
+
         <div class="loader" v-if="loading">
+
             <div class="spinner">
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
+                <div v-for="_ of 5"/>
             </div>
+
         </div>
+
     </Transition>
 
 </template>
@@ -749,73 +706,6 @@
     .v-enter-from,
     .v-leave-to {
         opacity: 0;
-    }
-
-    body, html {
-        padding: 0;
-        margin: 0;
-        overflow: hidden;
-        height: 100vh;
-        font-family: sans-serif;
-    }
-
-    .loader {
-        position: absolute;
-        background: rgba(0, 0, 0, 0.60);
-        width: 100vw;
-        height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .spinner {
-        position: relative;
-        width: 15.7px;
-        height: 15.7px;
-    }
-
-    .spinner div {
-        width: 100%;
-        height: 100%;
-        background-color: #49ff26;
-        border-radius: 50%;
-        animation: spinner-4t3wzl 1.25s infinite backwards;
-    }
-
-    .spinner div:nth-child(1) {
-        animation-delay: 0.15s;
-        background-color: rgba(129, 255, 71, 0.9);
-    }
-
-    .spinner div:nth-child(2) {
-        animation-delay: 0.3s;
-        background-color: rgba(74, 255, 71, 0.8);
-    }
-
-    .spinner div:nth-child(3) {
-        animation-delay: 0.45s;
-        background-color: rgba(86, 255, 71, 0.7);
-    }
-
-    .spinner div:nth-child(4) {
-        animation-delay: 0.6s;
-        background-color: rgba(135, 255, 71, 0.6);
-    }
-
-    .spinner div:nth-child(5) {
-        animation-delay: 0.75s;
-        background-color: rgba(86, 255, 71, 0.5);
-    }
-
-    @keyframes spinner-4t3wzl {
-        0% {
-            transform: rotate(0deg) translateY(-200%);
-        }
-
-        60%, 100% {
-            transform: rotate(360deg) translateY(-200%);
-        }
     }
 
 </style>
